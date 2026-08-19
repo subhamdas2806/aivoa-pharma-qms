@@ -7,7 +7,6 @@ import { FileDropZone } from './FileDropZone';
 import { SampleDataSelector } from './SampleDataSelector';
 import { addMessage, mergeFormState, setLoading } from '../../store/complaintSlice';
 import { api } from '../../services/api';
-import { Bot } from 'lucide-react';
 
 export const CopilotChat: React.FC = () => {
   const dispatch = useDispatch();
@@ -27,7 +26,6 @@ export const CopilotChat: React.FC = () => {
   const handleSendMessage = async (text: string) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
-    // Add user message to UI
     dispatch(addMessage({
       id: `user-${Date.now()}`,
       role: 'user',
@@ -39,16 +37,14 @@ export const CopilotChat: React.FC = () => {
       dispatch(setLoading(true));
       const res = await api.sendMessage(text, currentComplaint, chatHistory);
 
-      // Seamlessly merge the updated fields into the left form
       if (res.updated_state) {
         dispatch(mergeFormState(res.updated_state));
       }
 
-      // Add assistant response to UI
       dispatch(addMessage({
         id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: res.reply || "Extracted details and updated form fields.",
+        content: res.reply || "Updated the form with extracted details.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         updatedFields: Object.keys(res.extracted_fields || {})
       }));
@@ -56,7 +52,7 @@ export const CopilotChat: React.FC = () => {
       dispatch(addMessage({
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content: "⚠️ " + (err.response?.data?.detail || "Could not connect to LangGraph backend. Ensure the FastAPI server is active."),
+        content: "Error: " + (err.response?.data?.detail || "Could not connect to backend server."),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }));
     } finally {
@@ -67,11 +63,10 @@ export const CopilotChat: React.FC = () => {
   const handleFileUpload = async (file: File) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
-    // Add file upload event as user bubble with document preview
     dispatch(addMessage({
       id: `upload-${Date.now()}`,
       role: 'user',
-      content: `Uploaded complaint report for automated parsing.`,
+      content: `Uploaded file: ${file.name}`,
       document_name: file.name,
       timestamp
     }));
@@ -87,7 +82,7 @@ export const CopilotChat: React.FC = () => {
       dispatch(addMessage({
         id: `ai-doc-${Date.now()}`,
         role: 'assistant',
-        content: res.reply || `Extracted parameters from ${file.name} and mapped to QMS form.`,
+        content: res.reply || `Processed ${file.name} and populated form.`,
         document_name: file.name,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         updatedFields: Object.keys(res.extracted_fields || {})
@@ -96,7 +91,7 @@ export const CopilotChat: React.FC = () => {
       dispatch(addMessage({
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content: "⚠️ Failed to parse document: " + (err.response?.data?.detail || err.message),
+        content: "File processing error: " + (err.response?.data?.detail || err.message),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }));
     } finally {
@@ -105,29 +100,19 @@ export const CopilotChat: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-slate-200 shadow-xs">
-      {/* Top Bar matching reference specs */}
-      <div className="px-5 py-3.5 border-b border-slate-200/90 flex items-center justify-between bg-white">
+    <div className="flex flex-col h-full bg-white border-l border-slate-200">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div>
-          <div className="flex items-center space-x-2">
-            <h3 className="text-sm font-bold text-slate-900 tracking-tight">AIVOA Copilot</h3>
-            <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-              <span>Live Agent</span>
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-            Drop complaint files or paste text below
-          </p>
-        </div>
-
-        <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700">
-          <Bot className="w-4 h-4" />
+          <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
+            Assistant &amp; Intake Stream
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">Drop reports or write complaint text</p>
         </div>
       </div>
 
       {/* Chat Conversation Stream & Drop Zone */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/40">
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50">
         <FileDropZone onFileUpload={handleFileUpload} disabled={isLoading} />
         <SampleDataSelector onSelectSample={handleSendMessage} disabled={isLoading} />
 
@@ -137,23 +122,18 @@ export const CopilotChat: React.FC = () => {
           ))}
 
           {isLoading && (
-            <div className="flex items-start space-x-2.5 my-3.5">
-              <div className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-indigo-600 shadow-xs">
-                <Bot className="w-3.5 h-3.5" />
-              </div>
-              <div className="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-xs shadow-xs flex items-center space-x-2 text-xs text-slate-600">
-                <span className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce" />
-                <span className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce [animation-delay:0.2s]" />
-                <span className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce [animation-delay:0.4s]" />
-                <span className="font-medium text-slate-500 ml-1">Extracting batch parameters & GMP risk...</span>
-              </div>
+            <div className="flex items-center space-x-2 my-3 text-xs text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0.2s]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0.4s]" />
+              <span className="ml-1 text-slate-500 font-medium">Extracting information...</span>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Bottom Chat Input Bar */}
+      {/* Bottom Input */}
       <ChatInput
         onSendMessage={handleSendMessage}
         onFileUpload={handleFileUpload}

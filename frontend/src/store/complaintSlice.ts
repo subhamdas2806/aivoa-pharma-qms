@@ -10,6 +10,8 @@ interface ComplaintState {
   commitSuccess: boolean;
   lastCommittedId: string | null;
   error: string | null;
+  activeView: 'intake' | 'audit_log';
+  committedRecords: any[];
 }
 
 const initialComplaintData: ComplaintData = {
@@ -28,10 +30,10 @@ const initialComplaintData: ComplaintData = {
   },
   risk_assessment: {
     severity: 'Medium',
-    risk_summary: 'Awaiting quality defect extraction and hazard assessment.',
-    suggested_action: 'Collect initial complainant data and retain sample details.',
-    root_cause_recommendation: 'To be determined following full batch record review.',
-    capa_recommendation: 'Pending investigation outcome.',
+    risk_summary: '',
+    suggested_action: '',
+    root_cause_recommendation: '',
+    capa_recommendation: '',
   },
   document_name: null,
 };
@@ -42,7 +44,7 @@ const initialState: ComplaintState = {
     {
       id: 'welcome-msg',
       role: 'assistant',
-      content: 'Welcome to AIVOA QMS Copilot. You can describe a customer complaint in natural language, upload QA field reports, or drop a PDF document below to automatically extract batch parameters and generate GMP risk assessments.',
+      content: 'Upload a report or paste customer correspondence to populate the complaint form.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
   ],
@@ -51,6 +53,8 @@ const initialState: ComplaintState = {
   commitSuccess: false,
   lastCommittedId: null,
   error: null,
+  activeView: 'intake',
+  committedRecords: [],
 };
 
 export const complaintSlice = createSlice({
@@ -66,12 +70,24 @@ export const complaintSlice = createSlice({
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
+    setActiveView: (state, action: PayloadAction<'intake' | 'audit_log'>) => {
+      state.activeView = action.payload;
+    },
+    setCommittedRecords: (state, action: PayloadAction<any[]>) => {
+      state.committedRecords = action.payload;
+    },
     addMessage: (state, action: PayloadAction<ChatMessage>) => {
       state.chatHistory.push(action.payload);
     },
+    updateFormField: (state, action: PayloadAction<{ field: keyof ComplaintData['form']; value: string }>) => {
+      state.currentComplaint.form[action.payload.field] = action.payload.value;
+    },
+    updateRiskField: (state, action: PayloadAction<{ field: keyof ComplaintData['risk_assessment']; value: any }>) => {
+      (state.currentComplaint.risk_assessment as any)[action.payload.field] = action.payload.value;
+    },
     mergeFormState: (state, action: PayloadAction<Partial<ComplaintData>>) => {
       const incoming = action.payload;
-      
+
       if (incoming.complaint_id) {
         state.currentComplaint.complaint_id = incoming.complaint_id;
       }
@@ -106,7 +122,7 @@ export const complaintSlice = createSlice({
       state.commitSuccess = action.payload.success;
       state.lastCommittedId = action.payload.id;
       if (action.payload.success) {
-        state.currentComplaint.status = 'Committed to QMS';
+        state.currentComplaint.status = 'Committed';
       }
     },
     resetComplaint: (state) => {
@@ -126,7 +142,11 @@ export const {
   setLoading,
   setCommitting,
   setError,
+  setActiveView,
+  setCommittedRecords,
   addMessage,
+  updateFormField,
+  updateRiskField,
   mergeFormState,
   setCommitSuccess,
   resetComplaint

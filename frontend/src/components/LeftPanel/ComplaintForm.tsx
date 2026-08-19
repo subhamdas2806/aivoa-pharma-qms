@@ -5,9 +5,15 @@ import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { RiskAssessmentCard } from './RiskAssessmentCard';
 import { CommitModal } from './CommitModal';
-import { setCommitting, setCommitSuccess, addMessage } from '../../store/complaintSlice';
+import {
+  setCommitting,
+  setCommitSuccess,
+  addMessage,
+  updateFormField,
+  updateRiskField
+} from '../../store/complaintSlice';
 import { api } from '../../services/api';
-import { CheckCircle2, Lock, FileText } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 export const ComplaintForm: React.FC = () => {
   const dispatch = useDispatch();
@@ -26,134 +32,129 @@ export const ComplaintForm: React.FC = () => {
         dispatch(addMessage({
           id: `commit-${Date.now()}`,
           role: 'system',
-          content: `✅ Complaint ${res.complaint_id} has been formally committed to the QMS database.`,
+          content: `Complaint ${res.complaint_id} committed to database.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }));
       }
     } catch (err: any) {
-      alert("Failed to commit complaint: " + (err.response?.data?.detail || err.message));
+      alert("Failed to save complaint: " + (err.response?.data?.detail || err.message));
     } finally {
       dispatch(setCommitting(false));
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] overflow-y-auto p-4 sm:p-6 space-y-5">
-      {/* Top Form Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs">
+    <div className="flex flex-col h-full bg-[#f8fafc] overflow-y-auto p-6 space-y-5">
+      {/* Top Form Header Bar */}
+      <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center space-x-2.5">
-            <h2 className="text-base font-bold text-slate-900">Log Customer Complaint</h2>
-            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>• Ready to Commit</span>
-            </span>
-          </div>
+          <h2 className="text-base font-semibold text-slate-900">
+            Complaint Record Form
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            API & FDF Quality Assurance Module • Form fields are auto-populated via AIVOA Copilot
+            Review and edit the fields below before saving.
           </p>
         </div>
 
         <button
           onClick={handleCommit}
           disabled={isCommitting || commitSuccess}
-          className={`flex items-center justify-center space-x-2 px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-xs ${
+          className={`flex items-center space-x-1.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all shadow-xs ${
             commitSuccess
               ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-              : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20 active:scale-[0.98]"
+              : "bg-slate-900 hover:bg-slate-800 text-white"
           }`}
         >
           {commitSuccess ? (
             <>
-              <Lock className="w-3.5 h-3.5" />
-              <span>Committed to QMS</span>
+              <Check className="w-3.5 h-3.5" />
+              <span>Saved to Database</span>
             </>
           ) : isCommitting ? (
-            <>
-              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Committing...</span>
-            </>
+            <span>Saving...</span>
           ) : (
-            <>
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Commit to QMS</span>
-            </>
+            <span>Save Complaint</span>
           )}
         </button>
       </div>
 
-      {/* Section 1: Origin & Customer Details */}
-      <FormSection number="1" title="ORIGIN & CUSTOMER DETAILS">
+      {/* Section 1: Customer Info */}
+      <FormSection title="Customer Information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
-            label="Complaint Source"
+            label="Source / Channel"
             value={currentComplaint.form.complaint_source}
-            placeholder="e.g., Pharmacy / Retail Dispenser, Hospital QA, Email"
-            badge="Origin"
+            placeholder="e.g. Retail Pharmacy, Direct Email"
+            onChange={(val) => dispatch(updateFormField({ field: 'complaint_source', value: val }))}
           />
           <FormField
             label="Customer Name"
             value={currentComplaint.form.customer_name}
-            placeholder="e.g., Apollo Pharmacy, ABC Formulations Ltd."
+            placeholder="e.g. Apollo Pharmacy, ABC Formulations Ltd."
+            onChange={(val) => dispatch(updateFormField({ field: 'customer_name', value: val }))}
           />
         </div>
       </FormSection>
 
       {/* Section 2: Product & Batch Identification */}
-      <FormSection number="2" title="PRODUCT & BATCH IDENTIFICATION">
+      <FormSection title="Product & Batch Details">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             label="Product Name"
             value={currentComplaint.form.product_name}
-            placeholder="e.g., Amoxicillin Capsules, Metformin HCl API"
+            placeholder="e.g. Amoxicillin Capsules, Metformin HCl API"
+            onChange={(val) => dispatch(updateFormField({ field: 'product_name', value: val }))}
           />
           <FormField
-            label="Product Strength / Grade"
+            label="Strength / Grade"
             value={currentComplaint.form.product_strength}
-            placeholder="e.g., 500 mg, IP/BP, USP Grade"
+            placeholder="e.g. 500 mg, USP Grade"
+            onChange={(val) => dispatch(updateFormField({ field: 'product_strength', value: val }))}
           />
           <FormField
-            label="Batch / Lot Number"
+            label="Batch Number"
             value={currentComplaint.form.batch_number}
-            placeholder="e.g., AMX240602, MFH260712A"
+            placeholder="e.g. AMX240602, MFH260712A"
+            onChange={(val) => dispatch(updateFormField({ field: 'batch_number', value: val }))}
           />
           <FormField
             label="Affected Quantity"
             value={currentComplaint.form.affected_quantity}
-            placeholder="e.g., 12 capsules, 25 kg (1 HDPE Drum)"
+            placeholder="e.g. 12 capsules, 25 kg"
+            onChange={(val) => dispatch(updateFormField({ field: 'affected_quantity', value: val }))}
           />
           <FormField
             label="Manufacturing Date"
             value={currentComplaint.form.manufacturing_date}
-            placeholder="e.g., March 2026, 03/2026"
+            placeholder="e.g. 03/2026"
+            onChange={(val) => dispatch(updateFormField({ field: 'manufacturing_date', value: val }))}
           />
           <FormField
-            label="Expiry Date"
+            label="Expiration Date"
             value={currentComplaint.form.expiry_date}
-            placeholder="e.g., February 2028, Not Provided"
+            placeholder="e.g. 02/2028"
+            onChange={(val) => dispatch(updateFormField({ field: 'expiry_date', value: val }))}
           />
         </div>
       </FormSection>
 
-      {/* Complaint Observation Narrative */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-4 sm:p-5 space-y-2">
-        <div className="flex items-center space-x-2 pb-2 border-b border-slate-100">
-          <FileText className="w-4 h-4 text-slate-500" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-            COMPLAINT OBSERVATION & DEFECT DETAILS
-          </h2>
-        </div>
+      {/* Observation Narrative */}
+      <FormSection title="Observation & Description">
         <FormField
-          label="Detailed Defect Observation"
+          label="Complaint Description"
           value={currentComplaint.form.complaint_details}
-          placeholder="Extracted complaint narrative will be shown here..."
+          placeholder="Details of the defect or issue..."
           isTextArea
           rows={3}
+          onChange={(val) => dispatch(updateFormField({ field: 'complaint_details', value: val }))}
         />
-      </div>
+      </FormSection>
 
-      {/* Section 3: AI Risk Assessment */}
-      <RiskAssessmentCard assessment={currentComplaint.risk_assessment} />
+      {/* Section 3: Risk Assessment */}
+      <RiskAssessmentCard
+        assessment={currentComplaint.risk_assessment}
+        onChange={(field, val) => dispatch(updateRiskField({ field, value: val }))}
+      />
 
       {/* Confirmation Modal */}
       <CommitModal

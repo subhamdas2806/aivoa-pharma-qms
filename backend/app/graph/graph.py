@@ -7,8 +7,9 @@ def extract_information_node(state: AgentState) -> Dict[str, Any]:
     input_text = state["input_text"]
     current_state = state["current_state"]
     doc_name = state.get("document_name")
+    conversation_history = state.get("conversation_history", [])
     
-    extracted, ai_reply = llm_extractor.extract(input_text, current_state, doc_name)
+    extracted, ai_reply = llm_extractor.extract(input_text, current_state, doc_name, conversation_history)
     return {
         "extracted_delta": extracted,
         "ai_reply": ai_reply

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { Upload } from 'lucide-react';
 
 interface FileDropZoneProps {
   onFileUpload: (file: File) => void;
@@ -39,7 +39,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onFileUpload, disabl
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onClick={() => !disabled && fileInputRef.current?.click()}
-      className={`border-2 border-dashed border-slate-200/90 hover:border-indigo-400 bg-slate-50/60 hover:bg-indigo-50/20 rounded-xl p-3 text-center cursor-pointer transition-all ${
+      className={`border border-dashed border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50/50 rounded-xl p-3.5 text-center cursor-pointer transition-all ${
         disabled ? 'opacity-50 cursor-not-allowed' : ''
       }`}
     >
@@ -52,9 +52,9 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onFileUpload, disabl
         disabled={disabled}
       />
       <div className="flex items-center justify-center space-x-2 text-slate-600">
-        <UploadCloud className="w-4 h-4 text-indigo-600" />
-        <span className="text-xs font-semibold text-slate-700">Drop PDF complaint report</span>
-        <span className="text-[11px] text-slate-400">or click to browse</span>
+        <Upload className="w-4 h-4 text-slate-400" />
+        <span className="text-xs font-medium text-slate-700">Upload PDF report</span>
+        <span className="text-xs text-slate-400">or drop here</span>
       </div>
     </div>
   );

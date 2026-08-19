@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Send, Paperclip, Sparkles } from 'lucide-react';
+import { ArrowUp, Paperclip } from 'lucide-react';
 
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
@@ -29,7 +29,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="bg-white border-t border-slate-200/90 p-3 sm:p-4 space-y-2">
+    <div className="bg-white border-t border-slate-200 p-4">
       <form onSubmit={handleSubmit} className="relative flex items-center">
         <input
           type="file"
@@ -44,8 +44,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="absolute left-2.5 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
-          title="Attach PDF complaint report"
+          className="absolute left-3 p-1 text-slate-400 hover:text-slate-600 rounded transition-colors disabled:opacity-50"
+          title="Upload PDF document"
         >
           <Paperclip className="w-4 h-4" />
         </button>
@@ -54,28 +54,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Ask Copilot, type complaint details or paste text..."
+          placeholder="Paste complaint correspondence or type details..."
           disabled={disabled}
-          className="w-full pl-10 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+          className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/5 focus:border-slate-400 transition-all"
         />
 
         <button
           type="submit"
           disabled={!text.trim() || disabled}
-          className="absolute right-2 p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+          className="absolute right-2 p-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Send"
         >
-          <Send className="w-3.5 h-3.5" />
+          <ArrowUp className="w-3.5 h-3.5" />
         </button>
       </form>
-
-      {/* Mandatory LangGraph Footer Credit */}
-      <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 pt-0.5">
-        <span className="flex items-center space-x-1 font-mono tracking-wider font-semibold text-slate-500">
-          <Sparkles className="w-2.5 h-2.5 text-indigo-500" />
-          <span>POWERED BY LANGGRAPH & GROQ</span>
-        </span>
-        <span>GMP QA Intelligence</span>
-      </div>
     </div>
   );
 };
