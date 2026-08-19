@@ -188,12 +188,55 @@ Extract the delta and update the risk assessment based on GMP standards."""
             "cephalexin": "Cephalexin Capsules IP",
             "doxycycline": "Doxycycline Capsules IP",
             "clindamycin": "Clindamycin Capsules IP",
+            "ceftriaxone": "Ceftriaxone Injection",
+            "cefotaxime": "Cefotaxime Injection",
+            "vancomycin": "Vancomycin Injection",
+            "meropenem": "Meropenem Injection",
+            "piperacillin": "Piperacillin Injection",
+            "ampicillin": "Ampicillin Capsules",
+            "gentamicin": "Gentamicin Injection",
+            "tobramycin": "Tobramycin Injection",
+            "erythromycin": "Erythromycin Tablets IP",
+            "clarithromycin": "Clarithromycin Tablets IP",
+            "lincomycin": "Lincomycin Capsules",
+            "metronidazole": "Metronidazole Tablets IP",
+            "tinidazole": "Tinidazole Tablets IP",
+            "aciclovir": "Aciclovir Tablets IP",
+            "oseltamivir": "Oseltamivir Capsules",
+            "hydroxychloroquine": "Hydroxychloroquine Tablets IP",
+            "losartan": "Losartan Tablets IP",
+            "amlodipine": "Amlodipine Tablets IP",
+            "atorvastatin": "Atorvastatin Tablets IP",
+            "rosuvastatin": "Rosuvastatin Tablets IP",
+            "metoprolol": "Metoprolol Tablets IP",
+            "bisoprolol": "Bisoprolol Tablets IP",
+            "carvedilol": "Carvedilol Tablets IP",
+            "gliclazide": "Gliclazide Tablets IP",
+            "glimepiride": "Glimepiride Tablets IP",
+            "pioglitazone": "Pioglitazone Tablets IP",
+            "sitagliptin": "Sitagliptin Tablets IP",
+            "empagliflozin": "Empagliflozin Tablets IP",
+            "dapagliflozin": "Dapagliflozin Tablets IP",
+            "insulin": "Insulin Injection",
+            "enoxaparin": "Enoxaparin Injection",
+            "heparin": "Heparin Injection",
+            "warfarin": "Warfarin Tablets IP",
+            "rivaroxaban": "Rivaroxaban Tablets",
+            "apixaban": "Apixaban Tablets",
         }
         for keyword, product_name in product_map.items():
             if keyword in lower_t:
                 form_delta["product_name"] = product_name
                 updated_fields.append("Product Name")
                 break
+        
+        # General product name extraction if keyword map didn't match
+        # Looks for patterns like "regarding X 1g", "regarding X Injection", "regarding X Capsules"
+        if "product_name" not in form_delta:
+            prod_match = re.search(r'(?:regarding|about|for)\s+([A-Z][A-Za-z\s]+?)\s+(?:\d|Injection|Capsule|Tablet|Syrup|Suspension|Cream|Ointment|Drops|API)', text)
+            if prod_match:
+                form_delta["product_name"] = prod_match.group(1).strip()
+                updated_fields.append("Product Name")
 
         # Product Strength (handles decimals like 5.6%)
         strength_match = re.search(r'(\d+(?:\.\d+)?\s*(?:mg|g|mcg|ml|%|IP/BP|USP))', text, re.IGNORECASE)
@@ -237,32 +280,45 @@ Extract the delta and update the risk assessment based on GMP standards."""
             elif "email" in lower_t and not current_state.get("form", {}).get("complaint_source"):
                 form_delta["complaint_source"] = "Direct Email Inquiry"
         
-        # General customer name extraction from "report from X" or "client: X" patterns
+        # General customer name extraction from "report from X", "from X regarding", "client: X" patterns
         if "customer_name" not in form_delta:
-            report_from_match = re.search(r'(?:report|receiving|received)\s+(?:from|by)\s+([A-Z][A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting)|[.,])', text)
-            if report_from_match:
-                form_delta["customer_name"] = report_from_match.group(1).strip()
-                updated_fields.append("Customer Name")
-            elif "client" in lower_t:
-                client_match = re.search(r'client\s*:\s*([A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting)|[.,])', text, re.IGNORECASE)
-                if client_match:
-                    form_delta["customer_name"] = client_match.group(1).strip()
-                    updated_fields.append("Customer Name")
+            # Try multiple patterns for customer extraction
+            customer_patterns = [
+                r'(?:report|receiving|received|logged|filed)\s+(?:\w+\s+)*from\s+([A-Z][A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting|concerning)|[.,])',
+                r'from\s+([A-Z][A-Za-z\s&]+?)\s+(?:regarding|about|for|stating|noting|concerning)',
+                r'client\s*:\s*([A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting)|[.,])',
+            ]
+            for pattern in customer_patterns:
+                cust_match = re.search(pattern, text, re.IGNORECASE)
+                if cust_match:
+                    extracted = cust_match.group(1).strip()
+                    # Filter out common non-customer words
+                    skip_words = {"direct", "email", "phone", "web", "online", "chat", "the", "a", "an"}
+                    if extracted.lower().split()[0] not in skip_words and len(extracted) > 3:
+                        form_delta["customer_name"] = extracted
+                        updated_fields.append("Customer Name")
+                        break
 
         # Affected Quantity
         if "affected_quantity" not in form_delta:
-            qty_match = re.search(r'(\d+\s*(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs))', text, re.IGNORECASE)
-            if qty_match:
-                form_delta["affected_quantity"] = qty_match.group(1).strip()
+            # Prioritize "total affected quantity is X" pattern
+            total_qty_match = re.search(r'(?:total\s+)?(?:affected\s+)?quantity\s+(?:is\s+|of\s+)?(\d+\s*(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes))', text, re.IGNORECASE)
+            if total_qty_match:
+                form_delta["affected_quantity"] = total_qty_match.group(1).strip()
                 updated_fields.append("Affected Quantity")
+            else:
+                qty_match = re.search(r'(\d+\s*(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs))', text, re.IGNORECASE)
+                if qty_match:
+                    form_delta["affected_quantity"] = qty_match.group(1).strip()
+                    updated_fields.append("Affected Quantity")
 
         # Manufacturing & Expiry Dates
-        mfg_match = re.search(r'(?:Mfg|Manufacturing|MFD)(?:\s*Date)?[:\s]+(?:is\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
+        mfg_match = re.search(r'(?:Mfg|Manufacturing|MFD|manufactured)(?:\s*Date)?(?:\s+in)?[:\s]+(?:is\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
         if mfg_match:
             form_delta["manufacturing_date"] = mfg_match.group(1).strip()
             updated_fields.append("Manufacturing Date")
 
-        exp_match = re.search(r'(?:Exp|Expiry|EXP|Expiration|Expiry\s*Date)(?:\s*Date)?[:\s]+(?:is\s+|of\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
+        exp_match = re.search(r'(?:Exp|Expiry|EXP|Expiration|Expiry\s*Date)(?:\s*Date)?(?:\s+(?:is|of|on))?[:\s]+([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
         if exp_match:
             form_delta["expiry_date"] = exp_match.group(1).strip()
             updated_fields.append("Expiry Date")
