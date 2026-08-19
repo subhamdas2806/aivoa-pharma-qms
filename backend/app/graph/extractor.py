@@ -82,6 +82,11 @@ Extract the delta and update the risk assessment based on GMP standards."""
                 response = self.llm.invoke(messages)
                 content = response.content.strip()
                 
+                # Strip <think>...</think> blocks from thinking models (Qwen, etc.)
+                think_match = re.search(r'<think>(.*?)</think>', content, re.DOTALL)
+                if think_match:
+                    content = content[think_match.end():].strip()
+                
                 # Strip markdown code blocks if present
                 if content.startswith("```json"):
                     content = content[7:]
@@ -93,6 +98,16 @@ Extract the delta and update the risk assessment based on GMP standards."""
 
                 parsed = json.loads(content)
                 return parsed, parsed.get("ai_reply", "State updated successfully.")
+            except json.JSONDecodeError as je:
+                # Try to fix common JSON issues (trailing commas, etc.)
+                try:
+                    fixed = re.sub(r',\s*}', '}', content)
+                    fixed = re.sub(r',\s*]', ']', fixed)
+                    parsed = json.loads(fixed)
+                    return parsed, parsed.get("ai_reply", "State updated successfully.")
+                except Exception:
+                    pass
+                print(f"LLM extraction error: {je}, falling back to intelligent heuristic parser.")
             except Exception as e:
                 print(f"LLM extraction error: {e}, falling back to intelligent heuristic parser.")
 
