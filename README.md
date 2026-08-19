@@ -4,6 +4,12 @@ A web app for logging and managing customer complaints in pharmaceutical manufac
 
 Built for API (Active Pharmaceutical Ingredients) and FDF (Finished Dosage Forms) plants. Follows cGMP / FDA 21 CFR Part 211 guidelines for complaint handling.
 
+## Live Demo & Deployment
+
+- **Live Web App (Frontend):** [https://aivoa-pharma-qms-three.vercel.app](https://aivoa-pharma-qms-three.vercel.app)
+- **Backend API Base:** [https://aivoa-pharma-qms-yiym.onrender.com](https://aivoa-pharma-qms-yiym.onrender.com)
+- **Swagger API Documentation:** [https://aivoa-pharma-qms-yiym.onrender.com/docs](https://aivoa-pharma-qms-yiym.onrender.com/docs)
+
 ## What it does
 
 - You paste complaint text or drop a PDF into the chat panel
