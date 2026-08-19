@@ -295,6 +295,24 @@ Extract the delta and update the risk assessment based on GMP standards."""
             elif "email" in lower_t and not current_state.get("form", {}).get("complaint_source"):
                 form_delta["complaint_source"] = "Direct Email Inquiry"
         
+        # General source/channel extraction
+        if "complaint_source" not in form_delta:
+            if "call" in lower_t and ("customer" in lower_t or "phone" in lower_t):
+                form_delta["complaint_source"] = "Phone Call"
+                updated_fields.append("Source / Channel")
+            elif "web portal" in lower_t or "portal ticket" in lower_t:
+                form_delta["complaint_source"] = "Web Portal Ticket"
+                updated_fields.append("Source / Channel")
+            elif "email" in lower_t:
+                form_delta["complaint_source"] = "Email"
+                updated_fields.append("Source / Channel")
+            elif "notification" in lower_t or "submitted" in lower_t:
+                form_delta["complaint_source"] = "Quality Notification"
+                updated_fields.append("Source / Channel")
+            elif "report" in lower_t:
+                form_delta["complaint_source"] = "Report"
+                updated_fields.append("Source / Channel")
+        
         # General customer name extraction from "report from X", "from X regarding", "client: X" patterns
         if "customer_name" not in form_delta:
             # Try multiple patterns for customer extraction
@@ -316,23 +334,30 @@ Extract the delta and update the risk assessment based on GMP standards."""
 
         # Affected Quantity
         if "affected_quantity" not in form_delta:
+            qty_units = r'(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes|tubes|ampoules|vials|sachets|blisters|cartons)'
             # Prioritize "total affected quantity is X" pattern
-            total_qty_match = re.search(r'(?:total\s+)?(?:affected\s+)?quantity\s+(?:is\s+|of\s+)?(\d+\s*(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes))', text, re.IGNORECASE)
+            total_qty_match = re.search(rf'(?:total\s+)?(?:affected\s+)?quantity\s+(?:is\s+|of\s+)?(\d+\s*{qty_units})', text, re.IGNORECASE)
             if total_qty_match:
                 form_delta["affected_quantity"] = total_qty_match.group(1).strip()
                 updated_fields.append("Affected Quantity")
             else:
                 # Try "X defective/affected/reported capsules" first
-                ctx_qty_match = re.search(r'(\d+)\s+(?:defective|affected|reported|damaged|missing)\s+(capsules|tablets|bottles|drums|vials|strips|units|packs|boxes)', text, re.IGNORECASE)
+                ctx_qty_match = re.search(rf'(\d+)\s+(?:defective|affected|reported|damaged|missing|broken|contaminated)\s+{qty_units}', text, re.IGNORECASE)
                 if ctx_qty_match:
-                    form_delta["affected_quantity"] = f"{ctx_qty_match.group(1)} {ctx_qty_match.group(2)}"
+                    form_delta["affected_quantity"] = ctx_qty_match.group(0).strip()
                     updated_fields.append("Affected Quantity")
                 else:
-                    # Fallback: simple number + unit
-                    qty_match = re.search(r'(\d+)\s+(capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes)', text, re.IGNORECASE)
-                    if qty_match:
-                        form_delta["affected_quantity"] = f"{qty_match.group(1)} {qty_match.group(2)}"
+                    # Try "X of Y units" pattern (e.g., "45 tubes from Batch")
+                    of_qty_match = re.search(rf'(\d+)\s+{qty_units}\s+(?:from|in|of|across)', text, re.IGNORECASE)
+                    if of_qty_match:
+                        form_delta["affected_quantity"] = of_qty_match.group(0).strip().rsplit(' ', 1)[0]
                         updated_fields.append("Affected Quantity")
+                    else:
+                        # Fallback: simple number + unit
+                        qty_match = re.search(rf'(\d+)\s+{qty_units}', text, re.IGNORECASE)
+                        if qty_match:
+                            form_delta["affected_quantity"] = qty_match.group(0).strip()
+                            updated_fields.append("Affected Quantity")
 
         # Manufacturing & Expiry Dates
         mfg_match = re.search(r'(?:Mfg|Manufacturing|MFD|manufactured)(?:\s+date)?(?:\s+\w+)*?[:\s]+(?:is\s+|on\s+|of\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
