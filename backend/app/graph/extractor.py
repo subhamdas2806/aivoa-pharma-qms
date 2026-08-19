@@ -246,12 +246,14 @@ Extract the delta and update the risk assessment based on GMP standards."""
                 break
         
         # General product name extraction if keyword map didn't match
-        # Looks for patterns like "regarding X 1g", "regarding X Injection", "regarding X Capsules"
+        # Captures everything between "regarding/about/for" and the first parenthesis, comma, or period
         if "product_name" not in form_delta:
-            prod_match = re.search(r'(?:regarding|about|for)\s+([A-Z][A-Za-z\s]+?)\s+(?:\d|Injection|Capsule|Tablet|Syrup|Suspension|Cream|Ointment|Drops|API)', text)
+            prod_match = re.search(r'(?:regarding|about|for)\s+([A-Z][A-Za-z0-9\s\-]+?)(?:\s*\(|,|\.|\s+(?:was|is|has|had|show|shows|showed|due|because|and\s+the|with|from|Batch|The\s+batch))', text)
             if prod_match:
-                form_delta["product_name"] = prod_match.group(1).strip()
-                updated_fields.append("Product Name")
+                name = prod_match.group(1).strip()
+                if len(name) > 3:
+                    form_delta["product_name"] = name
+                    updated_fields.append("Product Name")
 
         # Product Strength (handles decimals like 5.6%)
         strength_match = re.search(r'(\d+(?:\.\d+)?\s*(?:mg|g|mcg|ml|%|IP/BP|USP))', text, re.IGNORECASE)
@@ -303,6 +305,9 @@ Extract the delta and update the risk assessment based on GMP standards."""
             elif "web portal" in lower_t or "portal ticket" in lower_t:
                 form_delta["complaint_source"] = "Web Portal Ticket"
                 updated_fields.append("Source / Channel")
+            elif "written" in lower_t and ("complaint" in lower_t or "logged" in lower_t):
+                form_delta["complaint_source"] = "Written Complaint"
+                updated_fields.append("Source / Channel")
             elif "email" in lower_t:
                 form_delta["complaint_source"] = "Email"
                 updated_fields.append("Source / Channel")
@@ -334,7 +339,7 @@ Extract the delta and update the risk assessment based on GMP standards."""
 
         # Affected Quantity
         if "affected_quantity" not in form_delta:
-            qty_units = r'(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes|tubes|ampoules|vials|sachets|blisters|cartons)'
+            qty_units = r'(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes|tubes|ampoules|sachets|blisters|cartons|pouches)'
             # Prioritize "total affected quantity is X" pattern
             total_qty_match = re.search(rf'(?:total\s+)?(?:affected\s+)?quantity\s+(?:is\s+|of\s+)?(\d+\s*{qty_units})', text, re.IGNORECASE)
             if total_qty_match:
@@ -348,15 +353,23 @@ Extract the delta and update the risk assessment based on GMP standards."""
                     updated_fields.append("Affected Quantity")
                 else:
                     # Try "X of Y units" pattern (e.g., "45 tubes from Batch")
-                    of_qty_match = re.search(rf'(\d+)\s+{qty_units}\s+(?:from|in|of|across)', text, re.IGNORECASE)
+                    of_qty_match = re.search(rf'(\d+)\s+(?:\w+\s+)?{qty_units}\s+(?:from|in|of|across)', text, re.IGNORECASE)
                     if of_qty_match:
-                        form_delta["affected_quantity"] = of_qty_match.group(0).strip().rsplit(' ', 1)[0]
+                        # Clean: extract just number + unit, skip adjectives like "individual"
+                        raw = of_qty_match.group(0)
+                        num_match = re.search(r'(\d+)', raw)
+                        unit_match = re.search(qty_units, raw, re.IGNORECASE)
+                        if num_match and unit_match:
+                            form_delta["affected_quantity"] = f"{num_match.group(1)} {unit_match.group(0)}"
+                        else:
+                            form_delta["affected_quantity"] = raw.rsplit(' ', 1)[0].strip()
                         updated_fields.append("Affected Quantity")
                     else:
-                        # Fallback: simple number + unit
-                        qty_match = re.search(rf'(\d+)\s+{qty_units}', text, re.IGNORECASE)
+                        # Fallback: simple number + optional adjective + unit
+                        qty_match = re.search(rf'(\d+)\s+(?:\w+\s+)?{qty_units}', text, re.IGNORECASE)
                         if qty_match:
-                            form_delta["affected_quantity"] = qty_match.group(0).strip()
+                            clean = re.search(rf'(\d+)\s+{qty_units}', qty_match.group(0), re.IGNORECASE)
+                            form_delta["affected_quantity"] = clean.group(0).strip() if clean else qty_match.group(0).strip()
                             updated_fields.append("Affected Quantity")
 
         # Manufacturing & Expiry Dates
