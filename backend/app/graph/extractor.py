@@ -307,13 +307,20 @@ Extract the delta and update the risk assessment based on GMP standards."""
                 form_delta["affected_quantity"] = total_qty_match.group(1).strip()
                 updated_fields.append("Affected Quantity")
             else:
-                qty_match = re.search(r'(\d+\s*(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs))', text, re.IGNORECASE)
-                if qty_match:
-                    form_delta["affected_quantity"] = qty_match.group(1).strip()
+                # Try "X defective/affected/reported capsules" first
+                ctx_qty_match = re.search(r'(\d+)\s+(?:defective|affected|reported|damaged|missing)\s+(capsules|tablets|bottles|drums|vials|strips|units|packs|boxes)', text, re.IGNORECASE)
+                if ctx_qty_match:
+                    form_delta["affected_quantity"] = f"{ctx_qty_match.group(1)} {ctx_qty_match.group(2)}"
                     updated_fields.append("Affected Quantity")
+                else:
+                    # Fallback: simple number + unit
+                    qty_match = re.search(r'(\d+)\s+(capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes)', text, re.IGNORECASE)
+                    if qty_match:
+                        form_delta["affected_quantity"] = f"{qty_match.group(1)} {qty_match.group(2)}"
+                        updated_fields.append("Affected Quantity")
 
         # Manufacturing & Expiry Dates
-        mfg_match = re.search(r'(?:Mfg|Manufacturing|MFD|manufactured)(?:\s*Date)?(?:\s+in)?[:\s]+(?:is\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
+        mfg_match = re.search(r'(?:Mfg|Manufacturing|MFD|manufactured)(?:\s+date)?(?:\s+\w+)*?[:\s]+(?:is\s+|on\s+|of\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
         if mfg_match:
             form_delta["manufacturing_date"] = mfg_match.group(1).strip()
             updated_fields.append("Manufacturing Date")
