@@ -14,6 +14,12 @@ Built for API (Active Pharmaceutical Ingredients) and FDF (Finished Dosage Forms
 - Risk assessment (severity, root cause, CAPA) is computed automatically
 - You commit the record to a SQLite/PostgreSQL database with an audit trail
 
+## Complaint Log (All Complaints view)
+
+The "All Complaints" tab displays committed records from the database in a structured table format. This is a **development/demo feature** — it exposes the raw database contents so you can verify that records are being saved correctly and inspect the stored data.
+
+In a production deployment, this view would be replaced with role-based access (QA managers, auditors) or removed entirely from the end-user interface.
+
 ## Tech stack
 
 | Layer | Tech |

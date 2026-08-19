@@ -14,8 +14,13 @@ interface ComplaintState {
   committedRecords: any[];
 }
 
+function generateCaseId(): string {
+  const num = Math.floor(1000 + Math.random() * 9000);
+  return `CMP-2026-${num}`;
+}
+
 const initialComplaintData: ComplaintData = {
-  complaint_id: 'CMP-2026-0081',
+  complaint_id: generateCaseId(),
   status: 'Ready to Commit',
   form: {
     complaint_source: '',
@@ -126,10 +131,9 @@ export const complaintSlice = createSlice({
       }
     },
     resetComplaint: (state) => {
-      const newIdNumber = Math.floor(1000 + Math.random() * 9000);
       state.currentComplaint = {
         ...initialComplaintData,
-        complaint_id: `CMP-2026-${newIdNumber}`,
+        complaint_id: generateCaseId(),
       };
       state.commitSuccess = false;
       state.lastCommittedId = null;
