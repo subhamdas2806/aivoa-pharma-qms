@@ -246,9 +246,13 @@ Extract the delta and update the risk assessment based on GMP standards."""
                 break
         
         # General product name extraction if keyword map didn't match
-        # Captures everything between "regarding/about/for" and the first parenthesis, comma, or period
+        # Captures everything between "regarding/about/for" and the first parenthesis or specific delimiters
         if "product_name" not in form_delta:
-            prod_match = re.search(r'(?:regarding|about|for)\s+([A-Z][A-Za-z0-9\s\-]+?)(?:\s*\(|,|\.|\s+(?:was|is|has|had|show|shows|showed|due|because|and\s+the|with|from|Batch|The\s+batch))', text)
+            # Use parenthesis as primary stop (handles "regarding X Y (strength, grade)")
+            prod_match = re.search(r'(?:regarding|about|for)\s+([A-Z][A-Za-z0-9\s\-\+\.\%]+?)(?:\s*\()', text)
+            if not prod_match:
+                # Fallback: stop before common sentence delimiters but not periods inside numbers
+                prod_match = re.search(r'(?:regarding|about|for)\s+([A-Z][A-Za-z0-9\s\-\+]+?)(?:\s+(?:was|is|has|had|show|shows|showed|due|because|and\s+the|with|from|Batch|The\s+batch|They|The\s+bags|Inspection|Discoloration))', text)
             if prod_match:
                 name = prod_match.group(1).strip()
                 if len(name) > 3:
@@ -276,7 +280,25 @@ Extract the delta and update the risk assessment based on GMP standards."""
                     form_delta["batch_number"] = code_match.group(1).strip()
                     updated_fields.append("Batch Number")
 
-        # Customer / Source
+        # Customer / Source — general extraction FIRST, keyword map as fallback
+        # General customer name extraction from "from X regarding", "by X regarding" patterns
+        if "customer_name" not in form_delta:
+            customer_patterns = [
+                r'(?:report|receiving|received|logged|filed|opened|submitted|alert)\s+(?:\w+\s+)*?(?:from|by)\s+([A-Z][A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting|concerning)|[.,])',
+                r'(?:from|by)\s+([A-Z][A-Za-z\s&]+?)\s+(?:regarding|about|for|stating|noting|concerning)',
+                r'client\s*:\s*([A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting)|[.,])',
+            ]
+            for pattern in customer_patterns:
+                cust_match = re.search(pattern, text, re.IGNORECASE)
+                if cust_match:
+                    extracted = cust_match.group(1).strip()
+                    skip_words = {"direct", "email", "phone", "web", "online", "chat", "the", "a", "an", "customer", "quality"}
+                    if extracted.lower().split()[0] not in skip_words and len(extracted) > 3:
+                        form_delta["customer_name"] = extracted
+                        updated_fields.append("Customer Name")
+                        break
+        
+        # Keyword map fallback (only if general extraction didn't find anything)
         if "customer_name" not in form_delta:
             if "apollo" in lower_t:
                 form_delta["customer_name"] = "Apollo Pharmacy Ltd."
@@ -299,11 +321,11 @@ Extract the delta and update the risk assessment based on GMP standards."""
         
         # General source/channel extraction
         if "complaint_source" not in form_delta:
-            if "call" in lower_t and ("customer" in lower_t or "phone" in lower_t):
-                form_delta["complaint_source"] = "Phone Call"
+            if "portal" in lower_t or "portal ticket" in lower_t:
+                form_delta["complaint_source"] = "Portal Ticket"
                 updated_fields.append("Source / Channel")
-            elif "web portal" in lower_t or "portal ticket" in lower_t:
-                form_delta["complaint_source"] = "Web Portal Ticket"
+            elif "call" in lower_t and ("customer" in lower_t or "phone" in lower_t):
+                form_delta["complaint_source"] = "Phone Call"
                 updated_fields.append("Source / Channel")
             elif "written" in lower_t and ("complaint" in lower_t or "logged" in lower_t):
                 form_delta["complaint_source"] = "Written Complaint"
@@ -317,29 +339,10 @@ Extract the delta and update the risk assessment based on GMP standards."""
             elif "report" in lower_t:
                 form_delta["complaint_source"] = "Report"
                 updated_fields.append("Source / Channel")
-        
-        # General customer name extraction from "report from X", "from X regarding", "client: X" patterns
-        if "customer_name" not in form_delta:
-            # Try multiple patterns for customer extraction
-            customer_patterns = [
-                r'(?:report|receiving|received|logged|filed)\s+(?:\w+\s+)*from\s+([A-Z][A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting|concerning)|[.,])',
-                r'from\s+([A-Z][A-Za-z\s&]+?)\s+(?:regarding|about|for|stating|noting|concerning)',
-                r'client\s*:\s*([A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting)|[.,])',
-            ]
-            for pattern in customer_patterns:
-                cust_match = re.search(pattern, text, re.IGNORECASE)
-                if cust_match:
-                    extracted = cust_match.group(1).strip()
-                    # Filter out common non-customer words
-                    skip_words = {"direct", "email", "phone", "web", "online", "chat", "the", "a", "an"}
-                    if extracted.lower().split()[0] not in skip_words and len(extracted) > 3:
-                        form_delta["customer_name"] = extracted
-                        updated_fields.append("Customer Name")
-                        break
 
         # Affected Quantity
         if "affected_quantity" not in form_delta:
-            qty_units = r'(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes|tubes|ampoules|sachets|blisters|cartons|pouches)'
+            qty_units = r'(?:capsules|tablets|bottles|drums|vials|strips|kg|units|packs|boxes|tubes|ampoules|sachets|blisters|cartons|pouches|bags|infusions|containers)'
             # Prioritize "total affected quantity is X" pattern
             total_qty_match = re.search(rf'(?:total\s+)?(?:affected\s+)?quantity\s+(?:is\s+|of\s+)?(\d+\s*{qty_units})', text, re.IGNORECASE)
             if total_qty_match:
