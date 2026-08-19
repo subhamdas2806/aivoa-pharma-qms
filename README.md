@@ -36,7 +36,7 @@ In a production deployment, this view would be replaced with role-based access (
 | Database | SQLite (default), PostgreSQL via env var |
 | PDF parsing | pypdf |
 
-The Groq API key is optional. Without it, a built-in heuristic extractor handles common pharma test cases (amoxicillin, metformin, paracetamol, norfloxacin, etc.) using regex and keyword matching.
+The Groq API key is optional. Without it, a built-in heuristic extractor handles common pharma test cases (amoxicillin, metformin, paracetamol, norfloxacin, etc.) using regex and keyword matching. With a valid API key and accessible model (default: `qwen/qwen3.6-27b`), the LLM provides more accurate and generalizable extraction.
 
 ## Setup
 
