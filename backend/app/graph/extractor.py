@@ -112,8 +112,8 @@ Extract the delta and update the risk assessment based on GMP standards."""
         # --- Explicit update commands (e.g., "update severity to high", "change batch number to X") ---
         SEVERITY_MAP = {"low": "Low", "medium": "Medium", "med": "Medium", "high": "High", "hi": "High", "critical": "High"}
 
-        # Explicit severity update: "severity to high", "severity to a med", "set severity medium", "change severity to high"
-        sev_match = re.search(r'severity\s+(?:to\s+(?:a\s+)?)?(\w+)', lower_t)
+        # Explicit severity update: "severity to high", "severity to a med", "set severity medium", "change severity to high", "severity level to high"
+        sev_match = re.search(r'severity\s+(?:level\s+)?(?:to\s+(?:a\s+)?)?(\w+)', lower_t)
         if sev_match:
             raw = sev_match.group(1).strip().lower()
             if raw in SEVERITY_MAP:
@@ -124,7 +124,7 @@ Extract the delta and update the risk assessment based on GMP standards."""
         #   "change batch number to X", "update batch to X", "change lot number to X"
         #   "change the AMX240602 to a MX240602902835" (old_val to new_val pattern)
         #   Also handles missing space: "MFH260712Ato a FH260712A4290"
-        batch_update_match = re.search(r'(?:update|change|set)\s+(?:the\s+)?(?:batch|lot)\s*(?:number)?\s*(?:to\s+(?:a\s+)?)?([A-Za-z0-9\-]+)', text)
+        batch_update_match = re.search(r'(?:update|change|set)\s+(?:the\s+)?(?:batch|lot)\s*(?:number)?\s+to\s+(?:a\s+)?([A-Za-z0-9\-]+)', text, re.IGNORECASE)
         if not batch_update_match:
             # Pattern: "change the OLDVAL to a NEWVAL" where OLDVAL looks like a batch
             # Allows optional spaces: "MFH260712Ato a FH260712A4290"
@@ -206,7 +206,7 @@ Extract the delta and update the risk assessment based on GMP standards."""
 
         # Batch Number (only if not already set by explicit update)
         if "batch_number" not in form_delta:
-            batch_match = re.search(r'(?:Batch|Lot)(?:\s*(?:No|Number|#)?:?|\s+ID:?)\s*([A-Z0-9\-]+)', text, re.IGNORECASE)
+            batch_match = re.search(r'(?:Batch|Lot)(?:\s*(?:No|Number|#)?:?|\s+ID:?)\s+(?:is\s+)?([A-Z0-9\-]{3,})', text, re.IGNORECASE)
             if batch_match:
                 form_delta["batch_number"] = batch_match.group(1).strip()
                 updated_fields.append("Batch Number")
@@ -230,8 +230,24 @@ Extract the delta and update the risk assessment based on GMP standards."""
                 form_delta["customer_name"] = "ABC Formulations Ltd."
                 form_delta["complaint_source"] = "FDF Customer Report"
                 updated_fields.extend(["Customer Name", "Complaint Source"])
+            elif "sun pharma" in lower_t:
+                form_delta["customer_name"] = "Sun Pharma R&D Facility"
+                form_delta["complaint_source"] = "R&D Facility Report"
+                updated_fields.extend(["Customer Name", "Complaint Source"])
             elif "email" in lower_t and not current_state.get("form", {}).get("complaint_source"):
                 form_delta["complaint_source"] = "Direct Email Inquiry"
+        
+        # General customer name extraction from "report from X" or "client: X" patterns
+        if "customer_name" not in form_delta:
+            report_from_match = re.search(r'(?:report|receiving|received)\s+(?:from|by)\s+([A-Z][A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting)|[.,])', text)
+            if report_from_match:
+                form_delta["customer_name"] = report_from_match.group(1).strip()
+                updated_fields.append("Customer Name")
+            elif "client" in lower_t:
+                client_match = re.search(r'client\s*:\s*([A-Za-z\s&]+?)(?:\s+(?:regarding|about|for|stating|noting)|[.,])', text, re.IGNORECASE)
+                if client_match:
+                    form_delta["customer_name"] = client_match.group(1).strip()
+                    updated_fields.append("Customer Name")
 
         # Affected Quantity
         if "affected_quantity" not in form_delta:
@@ -241,12 +257,12 @@ Extract the delta and update the risk assessment based on GMP standards."""
                 updated_fields.append("Affected Quantity")
 
         # Manufacturing & Expiry Dates
-        mfg_match = re.search(r'(?:Mfg|Manufacturing|MFD)(?:\s*Date)?:?\s*([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
+        mfg_match = re.search(r'(?:Mfg|Manufacturing|MFD)(?:\s*Date)?[:\s]+(?:is\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
         if mfg_match:
             form_delta["manufacturing_date"] = mfg_match.group(1).strip()
             updated_fields.append("Manufacturing Date")
 
-        exp_match = re.search(r'(?:Exp|Expiry|EXP)(?:\s*Date)?:?\s*([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
+        exp_match = re.search(r'(?:Exp|Expiry|EXP|Expiration|Expiry\s*Date)(?:\s*Date)?[:\s]+(?:is\s+|of\s+)?([A-Za-z0-9\/\-\.]+ \d{4}|\d{2}\/\d{4})', text, re.IGNORECASE)
         if exp_match:
             form_delta["expiry_date"] = exp_match.group(1).strip()
             updated_fields.append("Expiry Date")
@@ -267,8 +283,13 @@ Extract the delta and update the risk assessment based on GMP standards."""
         if not is_update_command and text.strip() and text.strip() not in user_messages:
             user_messages.append(text.strip())
         
-        # Build a structured summary from form state + user inputs
-        form = current_state.get("form", {})
+        # Build a structured summary using MERGED form state (current + newly extracted values)
+        # This ensures the description always reflects the latest updates
+        form = current_state.get("form", {}).copy()
+        # Merge form_delta into form so description reflects updated values
+        for k, v in form_delta.items():
+            if v is not None and v != "":
+                form[k] = v
         parts = []
         
         # Customer and source
